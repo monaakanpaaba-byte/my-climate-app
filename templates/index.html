@@ -1,0 +1,156 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Climate Temperature Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0b0f1a; --surface: #131929; --card: #1a2235;
+      --border: #2a3a55; --accent: #38bdf8; --accent2: #818cf8;
+      --hot: #fb923c; --cold: #67e8f9; --text: #e2e8f0;
+      --muted: #7c8fa6; --radius: 14px; --font: 'Courier New', monospace;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem 1rem; }
+    .container { max-width: 860px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem); letter-spacing: .12em; text-transform: uppercase;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+    }
+    header p { color: var(--muted); font-size: .85rem; margin-top: .4rem; letter-spacing: .06em; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.6rem; margin-bottom: 1.8rem; }
+    .card h2 { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.2rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .9rem; }
+    label { display: flex; flex-direction: column; gap: .35rem; font-size: .78rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+    input { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: var(--font); font-size: .9rem; padding: .6rem .85rem; outline: none; transition: border-color .2s; }
+    input:focus { border-color: var(--accent); }
+    button[type="submit"] {
+      margin-top: 1rem; background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 8px; color: #0b0f1a; cursor: pointer;
+      font-family: var(--font); font-size: .82rem; font-weight: bold;
+      letter-spacing: .1em; padding: .65rem 2rem; text-transform: uppercase; transition: opacity .2s;
+    }
+    button[type="submit"]:hover { opacity: .85; }
+    .chart-wrap { position: relative; height: 280px; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    thead th { color: var(--muted); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; padding: .5rem .8rem; border-bottom: 1px solid var(--border); text-align: left; }
+    tbody tr:hover { background: var(--surface); }
+    tbody td { padding: .55rem .8rem; border-bottom: 1px solid var(--border); }
+    .temp-hot { color: var(--hot); }
+    .temp-cold { color: var(--cold); }
+    .empty { color: var(--muted); font-size: .85rem; padding: 1rem 0; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>🌡 Climate Tracker</h1>
+    <p>Log and visualise temperature readings by city</p>
+  </header>
+
+  <!-- FORM: action="/submit" sends POST data to our Flask route -->
+  <div class="card">
+    <h2>Add a Reading</h2>
+    <form action="/submit" method="POST">
+      <div class="form-grid">
+        <!-- name="city" must match request.form.get("city") in app.py -->
+        <label>City
+          <input type="text" name="city" placeholder="e.g. Accra" required />
+        </label>
+        <label>Temperature (°C)
+          <input type="number" name="temperature" step="0.1" placeholder="e.g. 32.5" required />
+        </label>
+        <label>Date
+          <input type="date" name="date" required />
+        </label>
+      </div>
+      <button type="submit">Save Reading</button>
+    </form>
+  </div>
+
+  <!-- CHART: Chart.js draws here; data comes from readings_json below -->
+  <div class="card">
+    <h2>Temperature Over Time</h2>
+    <div class="chart-wrap">
+      <canvas id="tempChart"></canvas>
+    </div>
+  </div>
+
+  <!-- TABLE: Jinja2 loops over readings passed from app.py -->
+  <div class="card">
+    <h2>All Readings</h2>
+    {% if readings %}
+    <table>
+      <thead><tr><th>#</th><th>City</th><th>Temperature</th><th>Date</th></tr></thead>
+      <tbody>
+        {% for r in readings %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td>{{ r["city"] }}</td>
+          <td class="{{ 'temp-hot' if r['temperature'] >= 30 else 'temp-cold' }}">
+            {{ r["temperature"] }} °C
+          </td>
+          <td>{{ r["date"] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No readings yet — add one above!</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+  /*
+   * readings_json is passed from app.py as a plain Python list of dicts.
+   * Jinja2's tojson filter converts it to a safe JSON string for JavaScript.
+   * This is the cleanest way to pass server data to client-side JS.
+   */
+  const readings = { readings_json , tojson };
+
+  // Sort oldest first so the chart reads left-to-right chronologically
+  const sorted     = readings.slice().reverse();
+  const labels     = sorted.map(function(r) { return r.city + " - " + r.date; });
+  const temps      = sorted.map(function(r) { return r.temperature; });
+
+  const ctx = document.getElementById("tempChart").getContext("2d");
+
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Temperature (°C)",
+        data: temps,
+        borderColor: "#38bdf8",
+        backgroundColor: "rgba(56,189,248,0.12)",
+        pointBackgroundColor: "#38bdf8",
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        tension: 0.35,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: "#7c8fa6", font: { family: "Courier New" } } }
+      },
+      scales: {
+        x: { ticks: { color: "#7c8fa6", font: { size: 11 } }, grid: { color: "rgba(42,58,85,0.6)" } },
+        y: { ticks: { color: "#7c8fa6", font: { size: 11 } }, grid: { color: "rgba(42,58,85,0.6)" } }
+      }
+    }
+  });
+</script>
+</body>
+</html>
