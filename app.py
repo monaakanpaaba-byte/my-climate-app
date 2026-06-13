@@ -1,9 +1,11 @@
 # app.py
+from supabase import create_client, Client
 import os
 from flask import Flask, request, render_template, redirect, url_for
 import sqlite3
 
-
+SUPABASE_URL ="https://ctjdhlduppgeinnvfjnn.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0amRobGR1cHBnZWlubnZmam5uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMjc2MTEsImV4cCI6MjA5NjkwMzYxMX0.Wku9cjkaEUz1oIYuopJQq4Lpam_ZvFxWxxhjtyWyn4I"
 def init_db():
     try:
         # Get the directory where app.py is located
@@ -23,10 +25,7 @@ app = Flask(__name__)
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "climate.db")
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row  # lets us access columns by name
-    return conn
-
+       return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def init_db():
     with get_db() as conn:
