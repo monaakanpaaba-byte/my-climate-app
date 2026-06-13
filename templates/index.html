@@ -20,7 +20,8 @@
     header h1 {
       font-size: clamp(1.6rem, 4vw, 2.4rem); letter-spacing: .12em; text-transform: uppercase;
       background: linear-gradient(90deg, var(--accent), var(--accent2));
-      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
     }
     header p { color: var(--muted); font-size: .85rem; margin-top: .4rem; letter-spacing: .06em; }
     .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.6rem; margin-bottom: 1.8rem; }
@@ -37,6 +38,7 @@
     }
     button[type="submit"]:hover { opacity: .85; }
     .chart-wrap { position: relative; height: 280px; }
+    .no-data { color: var(--muted); font-size: .85rem; text-align: center; padding: 5rem 0; }
     table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     thead th { color: var(--muted); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; padding: .5rem .8rem; border-bottom: 1px solid var(--border); text-align: left; }
     tbody tr:hover { background: var(--surface); }
@@ -54,12 +56,11 @@
     <p>Log and visualise temperature readings by city</p>
   </header>
 
-  <!-- FORM: action="/submit" sends POST data to our Flask route -->
+  <!-- FORM -->
   <div class="card">
     <h2>Add a Reading</h2>
     <form action="/submit" method="POST">
       <div class="form-grid">
-        <!-- name="city" must match request.form.get("city") in app.py -->
         <label>City
           <input type="text" name="city" placeholder="e.g. Accra" required />
         </label>
@@ -74,15 +75,17 @@
     </form>
   </div>
 
-  <!-- CHART: Chart.js draws here; data comes from readings_json below -->
+  <!-- CHART -->
   <div class="card">
     <h2>Temperature Over Time</h2>
     <div class="chart-wrap">
+      <!-- canvas is always rendered; JS decides whether to draw or show "no data" -->
       <canvas id="tempChart"></canvas>
+      <p class="no-data" id="noDataMsg" style="display:none;">No readings yet — add one above!</p>
     </div>
   </div>
 
-  <!-- TABLE: Jinja2 loops over readings passed from app.py -->
+  <!-- TABLE -->
   <div class="card">
     <h2>All Readings</h2>
     {% if readings %}
@@ -109,48 +112,63 @@
 </div>
 
 <script>
-  /*
-   * readings_json is passed from app.py as a plain Python list of dicts.
-   * Jinja2's tojson filter converts it to a safe JSON string for JavaScript.
-   * This is the cleanest way to pass server data to client-side JS.
-   */
-  const readings = { readings_json , tojson };
+  // readings_json is injected by Flask/Jinja2 as a JSON array of objects.
+  // Each object looks like: { "id": 1, "city": "Accra", "temperature": 32.5, "date": "2024-06-01" }
+  var readings = { readings_json , tojson };
 
-  // Sort oldest first so the chart reads left-to-right chronologically
-  const sorted     = readings.slice().reverse();
-  const labels     = sorted.map(function(r) { return r.city + " - " + r.date; });
-  const temps      = sorted.map(function(r) { return r.temperature; });
+  // Log to browser console so you can verify the data arrived correctly.
+  // Open DevTools (F12) → Console to inspect this.
+  console.log("Readings from server:", readings);
 
-  const ctx = document.getElementById("tempChart").getContext("2d");
+  if (!readings || readings.length === 0) {
+    // No data — hide the canvas and show a friendly message instead
+    document.getElementById("tempChart").style.display = "none";
+    document.getElementById("noDataMsg").style.display = "block";
 
-  new Chart(ctx, {
-    type: "line",
-    data: {
-      labels: labels,
-      datasets: [{
-        label: "Temperature (°C)",
-        data: temps,
-        borderColor: "#38bdf8",
-        backgroundColor: "rgba(56,189,248,0.12)",
-        pointBackgroundColor: "#38bdf8",
-        pointRadius: 5,
-        pointHoverRadius: 7,
-        tension: 0.35,
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { labels: { color: "#7c8fa6", font: { family: "Courier New" } } }
+  } else {
+    // Sort oldest → newest so the chart reads left to right
+    var sorted = readings.slice().sort(function(a, b) {
+      return a.date > b.date ? 1 : -1;
+    });
+
+    // Build the X-axis labels and Y-axis data arrays
+    var labels = sorted.map(function(r) { return r.city + " - " + r.date; });
+    var temps  = sorted.map(function(r) { return parseFloat(r.temperature); });
+
+    console.log("Chart labels:", labels);
+    console.log("Chart temps:", temps);
+
+    var ctx = document.getElementById("tempChart").getContext("2d");
+
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Temperature (°C)",
+          data: temps,
+          borderColor: "#38bdf8",
+          backgroundColor: "rgba(56,189,248,0.12)",
+          pointBackgroundColor: "#38bdf8",
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          tension: 0.35,
+          fill: true
+        }]
       },
-      scales: {
-        x: { ticks: { color: "#7c8fa6", font: { size: 11 } }, grid: { color: "rgba(42,58,85,0.6)" } },
-        y: { ticks: { color: "#7c8fa6", font: { size: 11 } }, grid: { color: "rgba(42,58,85,0.6)" } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: "#7c8fa6", font: { family: "Courier New" } } }
+        },
+        scales: {
+          x: { ticks: { color: "#7c8fa6", font: { size: 11 } }, grid: { color: "rgba(42,58,85,0.6)" } },
+          y: { ticks: { color: "#7c8fa6", font: { size: 11 } }, grid: { color: "rgba(42,58,85,0.6)" } }
+        }
       }
-    }
-  });
+    });
+  }
 </script>
 </body>
 </html>
