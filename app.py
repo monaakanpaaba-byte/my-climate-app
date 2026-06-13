@@ -1,8 +1,8 @@
 # app.py
+import os
 from flask import Flask, request, render_template, redirect, url_for
 import sqlite3
 
-import os
 
 def init_db():
     try:
@@ -20,7 +20,7 @@ def init_db():
     except Exception as e:
         print(f"✗ Error initializing database: {e}")
 app = Flask(__name__)
-DATABASE = "climate.db"
+DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "climate.db")
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
