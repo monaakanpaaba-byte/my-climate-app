@@ -2,7 +2,7 @@
 # Flask maps URLs to Python functions ("routes").
 
 from flask import Flask, request, render_template, redirect, url_for
-import sqlite3
+from supabase import create_client
 import os
 
 app = Flask(__name__)
@@ -12,22 +12,30 @@ app = Flask(__name__)
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "climate.db")
 
 
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
+
+ 
 def get_db():
-    """
-    Opens a SQLite connection.
-    row_factory = sqlite3.Row lets us access columns by name (row["city"])
-    instead of by index (row[0]).
-    """
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# def get_db():
+#     """
+#     Opens a SQLite connection.
+#     row_factory = sqlite3.Row lets us access columns by name (row["city"])
+#     instead of by index (row[0]).
+#     """
+#     conn = sqlite3.connect(DATABASE)
+#     conn.row_factory = sqlite3.Row
+#     return conn
 
 
 def init_db():
     """Creates the readings table from schema.sql if it doesn't exist yet."""
-    with get_db() as conn:
-        with open("schema.sql", "r") as f:
-            conn.executescript(f.read())
+    db = get_db()
+    response = db.table("readings").select("*").order("date", desc=True).execute()
+    readings_list = response.data
 
 
 @app.route("/", methods=["GET"])
