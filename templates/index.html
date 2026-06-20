@@ -5,7 +5,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Climate Temperature Tracker</title>
+
+  <!-- Chart.js loaded from a CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -56,11 +59,14 @@
     <p>Log and visualise temperature readings by city</p>
   </header>
 
-  <!-- FORM -->
+  <!-- ── FORM ──────────────────────────────────────
+       action="/submit" + method="POST" sends the data
+       to our Flask submit() route -->
   <div class="card">
     <h2>Add a Reading</h2>
     <form action="/submit" method="POST">
       <div class="form-grid">
+        <!-- name="city" must match request.form.get("city") in app.py -->
         <label>City
           <input type="text" name="city" placeholder="e.g. Accra" required />
         </label>
@@ -75,17 +81,19 @@
     </form>
   </div>
 
-  <!-- CHART -->
+  <!-- ── CHART ─────────────────────────────────────
+       Chart.js draws into this <canvas>. Data comes
+       from readings_json via the script at the bottom -->
   <div class="card">
     <h2>Temperature Over Time</h2>
     <div class="chart-wrap">
-      <!-- canvas is always rendered; JS decides whether to draw or show "no data" -->
       <canvas id="tempChart"></canvas>
       <p class="no-data" id="noDataMsg" style="display:none;">No readings yet — add one above!</p>
     </div>
   </div>
 
-  <!-- TABLE -->
+  <!-- ── TABLE ─────────────────────────────────────
+       Jinja2 loops over `readings` (list of dicts from app.py) -->
   <div class="card">
     <h2>All Readings</h2>
     {% if readings %}
@@ -112,34 +120,33 @@
 </div>
 
 <script>
-  // readings_json is injected by Flask/Jinja2 as a JSON array of objects.
-  // Each object looks like: { "id": 1, "city": "Accra", "temperature": 32.5, "date": "2024-06-01" }
+  // readings_json comes from Flask via render_template().
+  // Jinja2's `tojson` filter safely converts the Python list of dicts
+  // into a real JavaScript array — e.g.
+  // [{ "city": "Accra", "temperature": 32.5, "date": "2024-06-01" }, ...]
   var readings = { readings_json , tojson };
 
-  // Log to browser console so you can verify the data arrived correctly.
-  // Open DevTools (F12) → Console to inspect this.
+  // Helpful for learning: open DevTools (F12) → Console to see this data
   console.log("Readings from server:", readings);
 
   if (!readings || readings.length === 0) {
-    // No data — hide the canvas and show a friendly message instead
+    // No data yet — hide the chart canvas, show a friendly message
     document.getElementById("tempChart").style.display = "none";
     document.getElementById("noDataMsg").style.display = "block";
 
   } else {
-    // Sort oldest → newest so the chart reads left to right
-    var sorted = readings.slice().sort(function(a, b) {
+    // Sort oldest → newest so the chart timeline reads left to right
+    var sorted = readings.slice().sort(function (a, b) {
       return a.date > b.date ? 1 : -1;
     });
 
-    // Build the X-axis labels and Y-axis data arrays
-    var labels = sorted.map(function(r) { return r.city + " - " + r.date; });
-    var temps  = sorted.map(function(r) { return parseFloat(r.temperature); });
-
-    console.log("Chart labels:", labels);
-    console.log("Chart temps:", temps);
+    // Build the arrays Chart.js needs
+    var labels = sorted.map(function (r) { return r.city + " - " + r.date; });
+    var temps  = sorted.map(function (r) { return parseFloat(r.temperature); });
 
     var ctx = document.getElementById("tempChart").getContext("2d");
 
+    // Create the line chart
     new Chart(ctx, {
       type: "line",
       data: {
@@ -152,7 +159,7 @@
           pointBackgroundColor: "#38bdf8",
           pointRadius: 5,
           pointHoverRadius: 7,
-          tension: 0.35,
+          tension: 0.35,   // slight curve on the line
           fill: true
         }]
       },
